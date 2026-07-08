@@ -50,6 +50,12 @@ void EngineeringConsole::begin()
     // Mode::EffectEngineMode.
     m_effectEngine.begin();
 
+    // Milestone 4A: starts the I2S mic peripheral. Independent pins
+    // (SCK=18, WS=4, SD=19) from LED/relay/button -- no conflict. Safe
+    // to fail: begin() logs a warning and leaves isAvailable() false
+    // rather than blocking or crashing boot.
+    m_audioInput.begin();
+
     printBanner();
     printMenu();
 }
@@ -77,6 +83,17 @@ void EngineeringConsole::update()
     // mode already uses -- read-only, no new GPIO access pattern.
     const ButtonGestureEngine::Gesture gesture = m_gestureEngine.update(digitalRead(BUTTON_PIN) == LOW);
     handleGesture(gesture);
+
+    // Milestone 4A: drains any newly available mic samples. Non-
+    // blocking (see AudioInput::update()) -- does not affect frame
+    // timing or button responsiveness.
+    m_audioInput.update();
+
+    if (m_continuousAudioDiag && now - m_lastAudioDiagMs >= 300)
+    {
+        m_lastAudioDiagMs = now;
+        printAudioDiagnostics();
+    }
 }
 
 void EngineeringConsole::handleGesture(ButtonGestureEngine::Gesture gesture)
@@ -180,6 +197,8 @@ void EngineeringConsole::printMenu()
     Serial.println("  - = Brightness down");
     Serial.println("  m = Print this menu again");
     Serial.println("  s = Print Engineering Console status");
+    Serial.println("  a = Print audio diagnostics (Milestone 4A, mic bring-up)");
+    Serial.println("  A = Toggle continuous audio diagnostics (~300ms)");
     Serial.println();
     Serial.println("Button Gesture Engine + Effect Engine: active (Milestone 3)");
     Serial.println("  1 Press        = Next Effect (within current Mode category)");
@@ -237,6 +256,16 @@ void EngineeringConsole::handleSerial()
             case 's':
             case 'S':
                 printEngineeringStatus();
+                break;
+
+            case 'a':
+                printAudioDiagnostics();
+                break;
+
+            case 'A':
+                m_continuousAudioDiag = !m_continuousAudioDiag;
+                Serial.print("Continuous Audio Diagnostics: ");
+                Serial.println(m_continuousAudioDiag ? "ON (every ~300ms)" : "OFF");
                 break;
 
             case '\r':
@@ -387,4 +416,19 @@ void EngineeringConsole::printEngineeringStatus()
     Serial.print("  Free Heap         "); Serial.println(ESP.getFreeHeap());
     Serial.println("================================================");
     Serial.println();
+}
+
+void EngineeringConsole::printAudioDiagnostics()
+{
+    // Read-only, same as printEngineeringStatus() -- no GPIO writes, no
+    // FastLED buffer writes, no relay calls. Milestone 4A: reports
+    // AudioInput's raw hardware readings only, no effect modulation.
+    Serial.println();
+    Serial.println("Audio Diagnostics");
+    Serial.print("  Raw:          "); Serial.println(m_audioInput.raw());
+    Serial.print("  Level:        "); Serial.println(m_audioInput.level());
+    Serial.print("  Peak:         "); Serial.println(m_audioInput.peak());
+    Serial.print("  Average:      "); Serial.println(m_audioInput.average());
+    Serial.print("  Noise Floor:  "); Serial.println(m_audioInput.noiseFloor());
+    Serial.print("  Available:    "); Serial.println(m_audioInput.isAvailable() ? "YES" : "NO (mic init failed)");
 }

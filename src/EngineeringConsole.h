@@ -32,6 +32,12 @@
  * no power toggle, no factory-reset erase. See PRODUCT_SPEC.md Section
  * 3, BRoadmap v1.3.
  *
+ * MILESTONE 4A: adds an AudioInput member -- I2S mic hardware bring-up
+ * only. `a` prints one-shot audio diagnostics, `A` toggles continuous
+ * diagnostics. The Audio Reactive Overlay flag from Milestone 3 is
+ * still just a flag here -- this milestone does NOT connect AudioInput
+ * readings to it or to EffectEngine in any way. No LED behavior change.
+ *
  * Scope boundary: this class is intentionally a standalone,
  * self-contained evolution of BringUpDashboard's own code -- it does
  * NOT include or depend on SystemManager, Hal, LEDDriver,
@@ -49,6 +55,7 @@
 #include <Arduino.h>
 #include "ButtonGestureEngine.h"
 #include "EffectEngine.h"
+#include "AudioInput.h"
 
 class EngineeringConsole
 {
@@ -95,8 +102,16 @@ private:
 
     // Tracked-only Audio Reactive Overlay flag. No microphone input is
     // implemented -- toggling this only changes what gets Serial-
-    // printed. See docs/PRODUCT_SPEC.md Section 10.
+    // printed. See docs/PRODUCT_SPEC.md Section 10. Milestone 4A does
+    // NOT connect this flag to m_audioInput or to any LED behavior.
     bool m_audioReactiveOverlay = false;
+
+    // Milestone 4A: standalone I2S mic bring-up. See AudioInput.h for
+    // why it owns the peripheral directly instead of being hardware-
+    // decoupled like ButtonGestureEngine/EffectEngine.
+    AudioInput m_audioInput;
+    bool m_continuousAudioDiag = false;
+    unsigned long m_lastAudioDiagMs = 0;
 
     void printMenu();
     void handleSerial();
@@ -111,6 +126,7 @@ private:
     void applyRelay(bool on);
     void applyBrightness();
     void printButtonStatus();
+    void printAudioDiagnostics();
 
     // Read-only: touches no GPIO, no FastLED buffer, no relay -- only
     // prints already-tracked state plus millis()/digitalRead()/
