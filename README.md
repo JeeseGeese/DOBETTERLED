@@ -6,19 +6,54 @@ controllers, built on the Arduino framework, FastLED, and PlatformIO/VS Code. Th
 is designed so future boards can be added by supplying a new
 `ProductConfig.h`, without touching manager or effect code.
 
-> **Status: v1.0.0 — hardware-confirmed on a real Dig2Go.** A standalone
-> Arduino+FastLED isolation test confirmed the actual wiring (15 WS2812B
-> LEDs, GPIO16, GRB, relay power on GPIO12), now patched into
-> `ProductConfig.h`. The framework (Config, ProductConfig, Types, HAL,
-> ButtonManager, LEDDriver, SettingsManager, PaletteManager,
-> EffectRegistry, AnimationManager, SystemManager) plus one effect
-> (`SolidEffect`) are wired end-to-end against this confirmed config.
-> **No new features, effects, or polish are being added until the full
-> button/brightness/factory-reset checklist is confirmed on hardware.**
-> See [`CHANGELOG.md`](CHANGELOG.md) for the exact expected behavior
-> checklist for this milestone, and
-> [`docs/PRODUCT_SPEC.md`](docs/PRODUCT_SPEC.md) for the full behavioral
-> spec beyond it.
+> **Status: this repo currently contains two unreconciled code paths.
+> Read this before touching anything.**
+>
+> 1. **Active build, awaiting hardware re-verification: the
+>    Engineering Console, v0.2.0-alpha, Milestone 3.** `main.cpp`
+>    instantiates `EngineeringConsole`. Diagnostic access (`s` for
+>    status, `m` for menu) is Serial-only and always available -- no
+>    button gesture is reserved for it. `ButtonGestureEngine`
+>    (Milestone 2) detects the finalized button gesture map (BRoadmap
+>    v1.3, see `docs/PRODUCT_SPEC.md` Section 3) and now also returns a
+>    `Gesture` value per call. `EffectEngine` (Milestone 3) wires
+>    **1/2/3/4-press gestures to real Next/Previous Effect (scoped to a
+>    Static/Motion/Reactive Mode category), Next Palette, and Next
+>    Mode** across a 6-effect starter set (Solid, Rainbow, Confetti,
+>    Sparkle, Chase, Fire) and 4 built-in palettes. Double Press + Hold
+>    toggles a tracked-only Audio Reactive Overlay flag (no microphone
+>    input implemented). Long Hold, 6-press, and 10-press remain
+>    detection/report-only. This build compiles cleanly
+>    (`pio run` — see `CHANGELOG.md`) but has **not yet been flashed to
+>    or confirmed on real hardware**; `BringUpDashboard.h`/`.cpp` remain
+>    unmodified as the one-line rollback target.
+> 2. **Dormant full architecture tree (not currently running, not
+>    hardware-confirmed):** `SystemManager`, `Hal`, `LEDDriver`,
+>    `ButtonManager`, `SettingsManager`, `PaletteManager`,
+>    `EffectRegistry`, `AnimationManager`, `SolidEffect`. This tree is
+>    architecturally complete and matches
+>    `docs/ARCHITECTURE_CONTRACT.md`, but its own hardware bring-up
+>    stalled mid-diagnostic (see `CHANGELOG.md`'s v1.0.1/v1.0.2 entries)
+>    and was never confirmed working before the project pivoted to the
+>    Bring-Up Dashboard instead. It is **not included, linked, or
+>    executed** by the current build. Do not assume it works. Its
+>    button/audio/effect design has been revised on paper three times
+>    since (`docs/PRODUCT_SPEC.md` Sections 3 and 10, BRoadmap v1.1 →
+>    v1.2 → v1.3) but none of that is implemented against the dormant
+>    tree itself — `ButtonGestureEngine` and `EffectEngine` (path 1
+>    above) are separate, standalone implementations, explicitly built
+>    to be extractable into `ButtonManager`/`AnimationManager` later,
+>    not a merge into them now.
+> 3. **Required later milestone:** reconcile these two paths -- either
+>    by getting the dormant tree confirmed working on hardware and
+>    retiring the standalone console, or by deliberately folding
+>    console functionality into `SystemManager` once that's proven.
+>    Until that milestone happens, treat path 2 as unverified and do
+>    not build new features on top of it.
+>
+> Prior status text (kept for history, no longer current): "v1.0.0 —
+> hardware-confirmed on a real Dig2Go" referred to path 2 above, before
+> its bring-up stalled and the project pivoted to path 1.
 
 ---
 
@@ -93,12 +128,16 @@ DOBETTERLED_PlatformIO/
 │   ├── DESIGN_LOG.md             Rationale trail for every architecture decision
 │   └── ARCHITECTURE_CONTRACT.md  Ownership boundaries for every module
 └── src/                          PlatformIO compiles everything here
-    ├── main.cpp                   Top-level entry point — only calls begin()/update()
-    ├── SystemManager.h / .cpp     Application coordinator
-    ├── AnimationBase.h            Animation interface + AnimationContext
+    ├── main.cpp                   Top-level entry point — instantiates EngineeringConsole
+    ├── EngineeringConsole.h / .cpp  ACTIVE, hardware-verified — Engineering Console + Developer Mode (v0.2.0-alpha)
+    ├── ButtonGestureEngine.h / .cpp  ACTIVE, awaiting hardware re-verification — Milestone 2 gesture detection (hardware-confirmed) + Milestone 3 Gesture-enum return, standalone (not part of dormant ButtonManager)
+    ├── EffectEngine.h / .cpp        ACTIVE, awaiting hardware re-verification — Milestone 3 effect/palette rendering, standalone (not part of dormant AnimationManager/EffectRegistry/PaletteManager)
+    ├── BringUpDashboard.h / .cpp    Unmodified, unreferenced — one-line rollback target (see CHANGELOG Milestone 1)
+    ├── SystemManager.h / .cpp     DORMANT — application coordinator, not hardware-confirmed (see status note above)
+    ├── AnimationBase.h            DORMANT — animation interface + AnimationContext
     ├── HAL/
-    │   └── Hal.h / .cpp            Hardware abstraction layer
-    ├── Managers/
+    │   └── Hal.h / .cpp            DORMANT — hardware abstraction layer
+    ├── Managers/                   (all DORMANT — see status note above)
     │   ├── LEDDriver.h / .cpp       FastLED encapsulation, pixel buffer, brightness
     │   ├── ButtonManager.h / .cpp    Button gesture state machine
     │   ├── SettingsManager.h / .cpp   NVS persistence, dirty-flag debounced commits
@@ -106,7 +145,7 @@ DOBETTERLED_PlatformIO/
     │   ├── EffectRegistry.h / .cpp      Stateless AnimationId -> effect lookup
     │   ├── AnimationManager.h / .cpp     Effect selection & per-frame invocation
     │   └── SoundManager.h                PLACEHOLDER stub (see file header)
-    ├── Effects/
+    ├── Effects/                     (DORMANT)
     │   └── SolidEffect.h / .cpp           The one effect implemented so far
     └── Utilities/                          (empty — Milestone 4)
 ```

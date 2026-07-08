@@ -5,6 +5,9 @@ build/
 *.elf
 *.map
 
+# PlatformIO build cache + downloaded libraries/toolchains
+.pio/
+
 # Arduino IDE 2.x
 .vscode/
 sketch.yaml
