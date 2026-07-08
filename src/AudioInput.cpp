@@ -20,14 +20,23 @@ namespace
     constexpr float AVERAGE_ALPHA = 0.2f;             // envelope smoothing (higher = more responsive)
     constexpr float NOISE_FLOOR_RISE_ALPHA = 0.001f;  // how slowly the floor is allowed to creep up
 
-    // First-pass scaling only -- not a calibrated dB conversion. The
-    // ICS-43434 delivers 24-bit data left-justified in the 32-bit I2S
-    // word; >>11 brings that into a smaller signed range that's easier
-    // to eyeball on a Serial print. Both this shift and
-    // ASSUMED_MAX_ABOVE_FLOOR below are expected to need tuning once
-    // real hardware readings are in hand via the `a`/`A` diagnostics.
+    // The ICS-43434 delivers 24-bit data left-justified in the 32-bit
+    // I2S word; >>11 brings that into a smaller signed range that's
+    // easier to eyeball on a Serial print. RAW_SHIFT is unchanged from
+    // the first pass -- Peak/Average already showed good dynamic range
+    // (hundreds to low thousands, no clipping/pinning) at this shift.
     constexpr int RAW_SHIFT = 11;
-    constexpr int32_t ASSUMED_MAX_ABOVE_FLOOR = 20000;
+
+    // Calibrated from a real hardware capture (this milestone's `A`
+    // continuous-diagnostics session): quiet-room noiseFloor settled
+    // around ~224, average during normal speech/room noise ran
+    // ~250-435, i.e. only ~10-200 above the floor. The original guess
+    // of 20000 here was ~100x too large, which is why Level sat at 0-2
+    // the whole time despite Average/Peak clearly moving. 400 gives a
+    // moderate speaking voice roughly the middle of the 0-255 range;
+    // still a first-pass calibration, not a proper dB scale, and may
+    // want further tuning once Milestone 4B/4C exercise it with music.
+    constexpr int32_t ASSUMED_MAX_ABOVE_FLOOR = 400;
 }
 
 void AudioInput::begin()
@@ -38,7 +47,13 @@ void AudioInput::begin()
     i2sConfig.mode = static_cast<i2s_mode_t>(I2S_MODE_MASTER | I2S_MODE_RX);
     i2sConfig.sample_rate = SAMPLE_RATE_HZ;
     i2sConfig.bits_per_sample = I2S_BITS_PER_SAMPLE_32BIT;
-    i2sConfig.channel_format = I2S_CHANNEL_FMT_ONLY_LEFT;
+    // The ICS-43434's L/R select pin is hardwired on the board (not a
+    // GPIO we control), and which side it's tied to isn't documented
+    // anywhere in this repo. First hardware test came back flat 0
+    // (Raw/Peak/Average all exactly zero, not just quiet) with LEFT --
+    // the classic symptom of reading the inactive channel slot.
+    // Flipped to RIGHT as the next thing to try.
+    i2sConfig.channel_format = I2S_CHANNEL_FMT_ONLY_RIGHT;
     i2sConfig.communication_format = I2S_COMM_FORMAT_STAND_I2S;
     i2sConfig.intr_alloc_flags = ESP_INTR_FLAG_LEVEL1;
     i2sConfig.dma_buf_count = 4;
