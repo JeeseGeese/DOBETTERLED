@@ -38,6 +38,14 @@
  * still just a flag here -- this milestone does NOT connect AudioInput
  * readings to it or to EffectEngine in any way. No LED behavior change.
  *
+ * MILESTONE 4B: wires the Overlay flag and AudioInput::level() into
+ * EffectEngine::render() at its one call site (Mode::EffectEngineMode
+ * in renderFrame()). This class still owns the flag and the mic --
+ * EffectEngine just gets told, per frame, whether to modulate and by
+ * how much. The flag itself is untouched by nextEffect()/
+ * previousEffect()/nextPalette()/nextMode(), so it persists across all
+ * of them by construction, same as before this milestone.
+ *
  * Scope boundary: this class is intentionally a standalone,
  * self-contained evolution of BringUpDashboard's own code -- it does
  * NOT include or depend on SystemManager, Hal, LEDDriver,
@@ -100,10 +108,12 @@ private:
     // EffectEngine.h for why it's standalone and hardware-free.
     EffectEngine m_effectEngine;
 
-    // Tracked-only Audio Reactive Overlay flag. No microphone input is
-    // implemented -- toggling this only changes what gets Serial-
-    // printed. See docs/PRODUCT_SPEC.md Section 10. Milestone 4A does
-    // NOT connect this flag to m_audioInput or to any LED behavior.
+    // Audio Reactive Overlay flag. A global on/off modifier, not a
+    // separate effect -- see docs/PRODUCT_SPEC.md Section 10. As of
+    // Milestone 4B this is passed into EffectEngine::render() each
+    // frame alongside m_audioInput.level() to modulate whichever
+    // effect is currently selected. Untouched by effect/palette/mode
+    // navigation, so it persists across all of them by construction.
     bool m_audioReactiveOverlay = false;
 
     // Milestone 4A: standalone I2S mic bring-up. See AudioInput.h for

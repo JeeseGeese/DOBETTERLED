@@ -132,14 +132,17 @@ void EngineeringConsole::handleGesture(ButtonGestureEngine::Gesture gesture)
 
         case ButtonGestureEngine::Gesture::DoublePressHold:
             // Global on/off modifier, not a separate effect -- persists
-            // across effect/palette/Mode changes, never blocks 1-4
-            // press navigation (see docs/PRODUCT_SPEC.md Section 10).
-            // No microphone input implemented yet -- tracked and
-            // Serial-reported only.
+            // across effect/palette/Mode changes (this flag is never
+            // touched by nextEffect()/previousEffect()/nextPalette()/
+            // nextMode()), never blocks 1-4 press navigation (see
+            // docs/PRODUCT_SPEC.md Section 10). Milestone 4B: now
+            // modulates whichever effect is selected -- see renderFrame().
             m_audioReactiveOverlay = !m_audioReactiveOverlay;
             Serial.print("Audio Reactive Overlay: ");
-            Serial.println(m_audioReactiveOverlay ? "ON" : "OFF");
-            Serial.println("  (tracked only -- no microphone input implemented yet)");
+            Serial.print(m_audioReactiveOverlay ? "ON" : "OFF");
+            Serial.print("  (level: ");
+            Serial.print(m_audioInput.level());
+            Serial.println(")");
             break;
 
         case ButtonGestureEngine::Gesture::SixPressPowerCandidate:
@@ -200,12 +203,12 @@ void EngineeringConsole::printMenu()
     Serial.println("  a = Print audio diagnostics (Milestone 4A, mic bring-up)");
     Serial.println("  A = Toggle continuous audio diagnostics (~300ms)");
     Serial.println();
-    Serial.println("Button Gesture Engine + Effect Engine: active (Milestone 3)");
+    Serial.println("Button Gesture Engine + Effect Engine: active (Milestone 4B)");
     Serial.println("  1 Press        = Next Effect (within current Mode category)");
     Serial.println("  2 Presses      = Previous Effect (within current Mode category)");
     Serial.println("  3 Presses      = Next Palette");
     Serial.println("  4 Presses      = Next Mode (Static -> Motion -> Reactive)");
-    Serial.println("  2 Presses+Hold = Toggle Audio Reactive Overlay (tracked only, no mic)");
+    Serial.println("  2 Presses+Hold = Toggle Audio Reactive Overlay (modulates current effect)");
     Serial.println("  Long Hold, 6 Presses, 10 Presses = detected/reported only, no action");
     Serial.println("  Any of 1/2/3/4-press switches live LEDs into Effect Engine mode.");
     Serial.println();
@@ -327,7 +330,12 @@ void EngineeringConsole::renderFrame()
             // Do nothing while relay is off.
             break;
         case Mode::EffectEngineMode:
-            m_effectEngine.render(g_engineeringConsoleLeds, NUM_LEDS);
+            // Milestone 4B: Audio Overlay ON modulates whichever effect
+            // is selected; OFF renders identically to before this
+            // milestone (see EffectEngine.cpp's per-effect audioActive
+            // branches).
+            m_effectEngine.render(g_engineeringConsoleLeds, NUM_LEDS,
+                                   m_audioReactiveOverlay, m_audioInput.level());
             FastLED.show();
             break;
     }
@@ -409,7 +417,8 @@ void EngineeringConsole::printEngineeringStatus()
     Serial.print("  Palette           "); Serial.println(m_effectEngine.currentPaletteName());
     Serial.println();
     Serial.println("Audio");
-    Serial.print("  Reactive Overlay  "); Serial.println(m_audioReactiveOverlay ? "ON (tracked only, no mic)" : "OFF");
+    Serial.print("  Reactive Overlay  "); Serial.println(m_audioReactiveOverlay ? "ON (modulating current effect)" : "OFF");
+    Serial.print("  Level             "); Serial.println(m_audioInput.level());
     Serial.println("  Mode              (not implemented -- SoundManager is dormant)");
     Serial.println();
     Serial.println("Memory");

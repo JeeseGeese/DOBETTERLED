@@ -23,6 +23,14 @@
  * ("Reactive" here is a visual-character category name -- unrelated to
  * the Audio Reactive Overlay toggle, which this class does not own; see
  * EngineeringConsole for that flag.)
+ *
+ * MILESTONE 4B: render() takes an audioActive/audioLevel pair so the
+ * caller (EngineeringConsole) can drive simple, per-effect modulation
+ * without this class owning the Overlay flag or the mic -- it still
+ * only ever fills a buffer from inputs it's given. When audioActive is
+ * false, every effect's math reduces to exactly its pre-4B behavior
+ * (verified per-effect in EffectEngine.cpp) -- Audio Overlay OFF must
+ * render identically to before this milestone.
  * -----------------------------------------------------------------------
  */
 
@@ -63,7 +71,13 @@ public:
     // Never calls FastLED.show(). Buffer contents are read as well as
     // written for effects that fade/decay in place (Confetti, Sparkle) --
     // the caller must pass the same persistent buffer every frame.
-    void render(CRGB* buffer, uint16_t numLeds);
+    //
+    // audioActive/audioLevel (Milestone 4B): the caller's Audio Overlay
+    // flag and the current AudioInput::level() (0-255). This class does
+    // not own either -- it's just told, per frame, whether to modulate
+    // and by how much. audioActive == false must render identically to
+    // every effect's pre-4B behavior.
+    void render(CRGB* buffer, uint16_t numLeds, bool audioActive = false, uint8_t audioLevel = 0);
 
     // Cycle within the current Mode category only.
     void nextEffect();
@@ -94,10 +108,10 @@ private:
 
     CRGBPalette16 resolvePalette() const;
 
-    void renderSolid(CRGB* buffer, uint16_t n);
-    void renderRainbow(CRGB* buffer, uint16_t n);
-    void renderConfetti(CRGB* buffer, uint16_t n);
-    void renderSparkle(CRGB* buffer, uint16_t n);
-    void renderChase(CRGB* buffer, uint16_t n);
-    void renderFire(CRGB* buffer, uint16_t n);
+    void renderSolid(CRGB* buffer, uint16_t n, bool audioActive, uint8_t audioLevel);
+    void renderRainbow(CRGB* buffer, uint16_t n, bool audioActive, uint8_t audioLevel);
+    void renderConfetti(CRGB* buffer, uint16_t n, bool audioActive, uint8_t audioLevel);
+    void renderSparkle(CRGB* buffer, uint16_t n, bool audioActive, uint8_t audioLevel);
+    void renderChase(CRGB* buffer, uint16_t n, bool audioActive, uint8_t audioLevel);
+    void renderFire(CRGB* buffer, uint16_t n, bool audioActive, uint8_t audioLevel);
 };
